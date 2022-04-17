@@ -9,6 +9,6 @@ DDSAnalytics was tasked by Frito Lay’s Executive Leadership to analyze talent 
 4. Job Role Insights
 
 In this repository you will find the following:
-Executive Summary of Case Study 2
-RMarkdown File containing all the supporting code forCase Study 2
+Executive Summary of Case Study 2, 
+RMarkdown File containing all the supporting code forCase Study 2, 
 PowerPoint Presentation 
