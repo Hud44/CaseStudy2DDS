@@ -1,0 +1,172 @@
+---
+title: "Case Study 2"
+author: "Hudson"
+date: "4/15/2022"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Link to presentation on Youtube
+https://www.youtube.com/watch?v=JMItop7TXVM
+
+Library load install
+```{r}
+#load in the needed packages
+
+library(magrittr)
+library(GGally)
+library(ggplot2)
+library(e1071)
+library(readr)
+library(class)
+library(caret)
+library(scales)
+library(corrplot)
+library(dplyr)
+#install.packages("Hmisc")
+library(Hmisc)
+
+
+
+#load in the data
+data1 = read_csv("~//Josh - Masters//Doing Data Science - MSDS_6306//Case Study 2//CaseStudy2-data.csv")
+knn1 = read_csv("~//Josh - Masters//Doing Data Science - MSDS_6306//Case Study 2//knn.csv")
+InterestingFinding = read_csv("~//Josh - Masters//Doing Data Science - MSDS_6306//Case Study 2//InterestingFinding.csv")
+Regression = read_csv("~//Josh - Masters//Doing Data Science - MSDS_6306//Case Study 2//Regression.csv")
+Attrition_Job_Role = read_csv("~//Josh - Masters//Doing Data Science - MSDS_6306//Case Study 2//Attrition_Job_Role.csv")
+Attrition_Over_Time = read_csv("~//Josh - Masters//Doing Data Science - MSDS_6306//Case Study 2//Attrition_Over_Time.csv")
+Attrition_Stock_Option_Level = read_csv("~//Josh - Masters//Doing Data Science - MSDS_6306//Case Study 2//Attrition_Stock_Option_Level.csv")
+#View(data)
+```
+
+1. Identify the top 3 factors that contribute to attrition
+```{r}
+#Bar graph for attrition v no attrition
+
+data1 %>% ggplot() + geom_bar(aes( x = Attrition, y=..prop.., group = 1, fill = factor(..x..)), stat="count") + ggtitle("Frito Lay Employee Attrition") + scale_y_continuous(labels=percent_format()) + ylab("Percent") 
+
+#Reduce "data" to only columns made of categorical variables
+cat_data  = data1 %>% select(Attrition, BusinessTravel, Department, Education, EducationField, EnvironmentSatisfaction, Gender, JobInvolvement, JobLevel, JobRole, JobSatisfaction, MaritalStatus, OverTime, PerformanceRating, RelationshipSatisfaction, StockOptionLevel, WorkLifeBalance, TrainingTimesLastYear)
+
+#Convert all numeric values to characters
+cat_data = data.frame(sapply(cat_data, as.character))
+
+
+#Assign categories to continuous data to prepare for chi square testing using quartile ranges
+cat_data$Age_cat = cut(data1$Age, breaks = c(0,20,30,40,50, 60, 100), labels = c("Teens","Twenties","Thirties", "Fourties", "Fifties", "60 Plus"))
+
+
+#summary(data$DailyRate)
+cat_data$DailyRate_cat = cut(data1$DailyRate , breaks = c(0, 472.5, 817.5, 1165.8, 2000), labels = c("Low", "Mid", "High", "Very High"))
+
+#summary(data$DistanceFromHome )
+cat_data$DistanceFromHome_cat = cut(data1$DistanceFromHome , breaks = c(0, 2, 7, 14, 29), labels = c("Very Close", "Close", "Far", "Very Far"))
+
+#summary(data$EmployeeNumber )
+cat_data$EmployeeNumber_cat = cut(data1$EmployeeNumber , breaks = c(0, 447.2, 1039.0, 1561.5, 2064.0), labels = c("veteran", "Very Experienced", "Experienced", "Unexperienced"))
+
+#summary(data$HourlyRate )
+cat_data$HourlyRate_cat = cut(data1$HourlyRate , breaks = c(0, 30, 66, 83, 150), labels = c("Low", "Mid", "High", "Very High"))
+
+#summary(data$MonthlyIncome )
+cat_data$MonthlyIncome_cat = cut(data1$MonthlyIncome , breaks = c(0, 1081, 2840, 8182, 20000), labels = c("Low", "Mid", "High", "Very High"))
+
+#summary(data$MonthlyRate )
+cat_data$MonthlyRate_cat = cut(data1$MonthlyRate , breaks = c(0, 2094, 14074, 20456, 27000), labels = c("Low", "Mid", "High", "Very High"))
+
+#summary(data$NumCompaniesWorked )
+cat_data$NumCompaniesWorked_cat = cut(data1$NumCompaniesWorked , breaks = c(-1, 1, 2, 4, 10), labels = c("None Other", "One", "Two to Four", "More Than Four"))
+
+#summary(data$PercentSalaryHike )
+cat_data$PercentSalaryHike_cat = cut(data1$PercentSalaryHike , breaks = c(0, 11, 12, 18, 26), labels = c("Low", "Mid", "High", "Very High"))
+
+#summary(data$TotalWorkingYears )
+cat_data$TotalWorkingYears_cat = cut(data1$TotalWorkingYears , breaks = c(-1, 6, 10, 15, 41), labels = c("Very Few", "Few", "Many", "Very Many"))
+
+#summary(data$YearsAtCompany )
+cat_data$YearsAtCompany_cat = cut(data1$YearsAtCompany , breaks = c(-1, 6, 10, 15, 41), labels = c("Very Few", "Few", "Many", "Very Many"))
+
+#summary(data$YearsInCurrentRole )
+cat_data$YearsInCurrentRole_cat = cut(data1$YearsInCurrentRole , breaks = c(-1, 2, 3, 7, 19), labels = c("Very Few", "Few", "Many", "Very Many"))
+
+#summary(data$YearsSinceLastPromotion )
+cat_data$YearsSinceLastPromotion_cat = cut(data1$YearsSinceLastPromotion , breaks = c(1, 0.9, 5, 10.1, 19), labels = c("Very Few", "Few", "Many", "Very Many"))
+
+#summary(data$YearsWithCurrManager )
+cat_data$YearsWithCurrManager_cat = cut(data1$YearsWithCurrManager , breaks = c(-1, 0.9, 5, 10.1, 19), labels = c("Less Than One", "One to Five", "Six to Ten", "More Than Ten"))
+
+#head(cat_data)
+#head(data)
+
+#run for loop to determine the each factors contribution to Attrition
+i = 0
+j = 0
+attrition_rating = data.frame(Variable = c(0), Contribution_Rating_pval = c(0))
+for (i in 1:32){
+  attrition_rating[i, 1] = names(cat_data[i])
+  attrition_rating[i, 2] = chisq.test(cat_data[,i], cat_data[,1])[3]
+}
+attrition_rating = attrition_rating[-c(1),]
+attrition_rating = attrition_rating %>% arrange(Contribution_Rating_pval)
+attrition_rating
+
+#plot the top 3 factors of attrition using chi square
+Attrition_Over_Time %>% ggplot(mapping = aes(x = Job_Status, y = Proportion, fill = Job_Status)) + geom_col() + ggtitle("Percent Attrition for Hourly v. Salary")+ scale_y_continuous(labels=percent_format()) + ylab("Percent")
+Attrition_Stock_Option_Level %>% ggplot(mapping = aes(x = StockOptionLevel, y = Proportion, fill = StockOptionLevel)) + geom_col() + ggtitle("Percent Attrition for Stock Option Levels")+ scale_y_continuous(labels=percent_format()) + ylab("Percent")
+Attrition_Job_Role %>% ggplot(mapping = aes(x = JobRole, y = Proportion, fill = JobRole)) + geom_col() + ggtitle("Percent Attrition for each Job Role")+ scale_y_continuous(labels=percent_format()) + ylab("Percent")
+```
+
+2. Predict attrition using a model (Knn)
+```{r}
+set.seed(1)
+splitPerc = .70
+df = knn1 
+
+
+trainIndices = sample(1:dim(df)[1],round(splitPerc * dim(df)[1]))
+train = knn1[trainIndices,]
+test = knn1[-trainIndices,]
+
+
+# k = 3
+classifications = knn(train[,c(2:4)],test[,c(2:4)],train$Attrition, prob = TRUE, k = 3)
+table(classifications,test$Attrition)
+confusionMatrix(table(classifications,test$Attrition))
+#2, 3, 4, 25
+```
+
+
+Understand variable correlation for regression model AND Trend Identification
+```{r}
+cont_data = data.frame(data1$Age, data1$DailyRate, data1$DistanceFromHome, data1$EmployeeNumber, data1$HourlyRate, data1$MonthlyIncome, data1$MonthlyRate,  data1$NumCompaniesWorked, data1$PercentSalaryHike, data1$TotalWorkingYears, data1$YearsAtCompany, data1$YearsInCurrentRole, data1$YearsSinceLastPromotion, data1$YearsWithCurrManager )
+cont_data
+ct_cont_data = cor(cont_data)
+testRes = cor.mtest(cont_data, conf.level = 0.95)
+corrplot(ct_cont_data, p.mat = testRes$p, sig.level = 0.05, order = 'hclust', addrect = 2)
+
+```
+
+3. Regression 
+```{r}
+r = Regression
+
+
+fit = lm(Average_MonthlyIncome ~ Age + Average_YearsAtCompany, data= r)
+summary(fit)
+
+RMSE = sqrt(mean(fit$residuals^2))
+RMSE
+
+library(plotly)
+p <- plot_ly(r, x = ~Age, y = ~Average_YearsAtCompany, z = ~Average_MonthlyIncome, color = "green") %>% add_markers() %>% layout(scene = list(xaxis = list(title = 'Age'), yaxis = list(title = 'Average Years At Company'), zaxis = list(title = 'Average Montly Income')))
+```
+
+4. Interesting Finding
+```{r}
+InterestingFinding
+```
